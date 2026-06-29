@@ -5,7 +5,7 @@ use nih_plug::prelude::*;
 use nih_plug_egui::{
 	create_egui_editor,
 	egui::{self, RichText, Stroke, UiBuilder, Vec2},
-	resizable_window::ResizableWindow,
+	resizable_window::{ResizableWindow, ResizeEdges},
 	EguiState,
 };
 
@@ -143,6 +143,8 @@ impl Plugin for SimplePlugin {
 
 				ResizableWindow::new("simple-egui-plugin-window")
 					.min_size(Vec2::new(760.0, 520.0))
+					.resize_margin(OUTER_PADDING)
+					.resize_edges(ResizeEdges::RIGHT | ResizeEdges::BOTTOM | ResizeEdges::BOTTOM_RIGHT)
 					.show(egui_ctx, egui_state.as_ref(), |ui| {
 						let content_rect = ui.max_rect().shrink(OUTER_PADDING);
 						ui.painter().rect_filled(ui.max_rect(), 0.0, palette::APP_BG);
