@@ -76,13 +76,21 @@ pub struct EguiState {
 	#[serde(skip)]
 	requested_size: AtomicCell<Option<(u32, u32)>>,
 
-	/// The window size at the start of an in-progress resize gesture.
+	/// State for a resize gesture. Screen-space deltas stay stable while the host resizes the
+	/// embedded editor view under the pointer.
 	#[serde(skip)]
-	resize_drag_start_size: AtomicCell<Option<(u32, u32)>>,
+	resize_drag: AtomicCell<Option<ResizeDrag>>,
 
 	/// Whether the editor's window is currently open.
 	#[serde(skip)]
 	open: AtomicBool,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ResizeDrag {
+	pub last_screen_pos: (f32, f32),
+	pub accumulated_size: (f32, f32),
+	pub last_requested_size: (u32, u32),
 }
 
 impl<'a> PersistentField<'a, EguiState> for Arc<EguiState> {
@@ -105,7 +113,7 @@ impl EguiState {
 		Arc::new(EguiState {
 			size: AtomicCell::new((width, height)),
 			requested_size: Default::default(),
-			resize_drag_start_size: Default::default(),
+			resize_drag: Default::default(),
 			open: AtomicBool::new(false),
 		})
 	}

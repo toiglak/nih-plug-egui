@@ -141,50 +141,46 @@ impl Plugin for SimplePlugin {
 				state.record_frame();
 				handle_shortcuts(egui_ctx, setter, state, &params);
 
-				egui::CentralPanel::default()
-					.frame(egui::Frame::default().fill(palette::APP_BG))
-					.show(egui_ctx, |ui| {
-						ResizableWindow::new("simple-egui-plugin-window")
-							.min_size(Vec2::new(760.0, 520.0))
-							.handle_margin(OUTER_PADDING)
-							.show(ui.ctx(), egui_state.as_ref(), |ui| {
-								let container_rect = ui.max_rect().shrink(0.5);
-								ui.painter().rect(
-									container_rect,
-									10.0,
-									palette::PANEL_BG,
-									Stroke::new(1.0, palette::CARD_STROKE),
-									egui::StrokeKind::Inside,
-								);
+				ResizableWindow::new("simple-egui-plugin-window")
+					.min_size(Vec2::new(760.0, 520.0))
+					.show(egui_ctx, egui_state.as_ref(), |ui| {
+						let content_rect = ui.max_rect().shrink(OUTER_PADDING);
+						ui.painter().rect_filled(ui.max_rect(), 0.0, palette::APP_BG);
+						ui.painter().rect(
+							content_rect.shrink(0.5),
+							10.0,
+							palette::PANEL_BG,
+							Stroke::new(1.0, palette::CARD_STROKE),
+							egui::StrokeKind::Inside,
+						);
 
-								let inner_rect = container_rect.shrink(18.0);
-								let mut content_ui = ui.new_child(UiBuilder::new().max_rect(inner_rect).layout(*ui.layout()));
-								content_ui.spacing_mut().item_spacing = Vec2::new(14.0, 14.0);
-								draw_header(&mut content_ui, state, &params);
-								content_ui.add_space(2.0);
+						let inner_rect = content_rect.shrink(18.0);
+						let mut content_ui = ui.new_child(UiBuilder::new().max_rect(inner_rect).layout(*ui.layout()));
+						content_ui.spacing_mut().item_spacing = Vec2::new(14.0, 14.0);
+						draw_header(&mut content_ui, state, &params);
+						content_ui.add_space(2.0);
 
-								egui::ScrollArea::vertical()
-									.auto_shrink([false, false])
-									.show(&mut content_ui, |ui| {
-										ui.columns(3, |columns| {
-											columns[0].vertical(|ui| {
-												host_and_parameter_sync(ui, setter, &params);
-												animation_probe(ui, state, params.gain.value());
-												hover_and_cursors(ui, state);
-											});
-
-											columns[1].vertical(|ui| {
-												text_and_keyboard_probe(ui, state);
-												resize_scale_focus_probe(ui, state, egui_state.as_ref());
-												tooltip_probe(ui);
-											});
-
-											columns[2].vertical(|ui| {
-												lazy_list_probe(ui, state);
-												manual_matrix(ui);
-											});
-										});
+						egui::ScrollArea::vertical()
+							.auto_shrink([false, false])
+							.show(&mut content_ui, |ui| {
+								ui.columns(3, |columns| {
+									columns[0].vertical(|ui| {
+										host_and_parameter_sync(ui, setter, &params);
+										animation_probe(ui, state, params.gain.value());
+										hover_and_cursors(ui, state);
 									});
+
+									columns[1].vertical(|ui| {
+										text_and_keyboard_probe(ui, state);
+										resize_scale_focus_probe(ui, state, egui_state.as_ref());
+										tooltip_probe(ui);
+									});
+
+									columns[2].vertical(|ui| {
+										lazy_list_probe(ui, state);
+										manual_matrix(ui);
+									});
+								});
 							});
 					});
 			},

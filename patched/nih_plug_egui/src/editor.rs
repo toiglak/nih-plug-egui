@@ -4,7 +4,7 @@ use crate::{
 	egui::{Vec2, ViewportCommand},
 	EguiState,
 };
-use baseview::{gl::GlConfig, Size, WindowHandle, WindowOpenOptions, WindowScalePolicy};
+use baseview::{gl::GlConfig, PhySize, Size, WindowHandle, WindowOpenOptions, WindowScalePolicy};
 use crossbeam::atomic::AtomicCell;
 use egui_baseview::{egui::Context, EguiWindow};
 use nih_plug::prelude::{Editor, GuiContext, ParamSetter, ParentWindowHandle};
@@ -97,7 +97,7 @@ where
 			Default::default(),
 			state,
 			move |egui_ctx, _queue, state| build(egui_ctx, &mut state.write()),
-			move |egui_ctx, _queue, state| {
+			move |egui_ctx, queue, state| {
 				let setter = ParamSetter::new(context.as_ref());
 
 				if let Some(new_size) = egui_state.requested_size.load() {
@@ -105,6 +105,11 @@ where
 					egui_state.requested_size.store(None);
 
 					if context.request_resize() {
+						let scale_factor = egui_ctx.pixels_per_point();
+						let physical_width = (new_size.0 as f32 * scale_factor).round().max(1.0) as u32;
+						let physical_height = (new_size.1 as f32 * scale_factor).round().max(1.0) as u32;
+
+						queue.resize(PhySize::new(physical_width, physical_height));
 						egui_ctx.send_viewport_cmd(ViewportCommand::InnerSize(Vec2::new(
 							new_size.0 as f32,
 							new_size.1 as f32,
