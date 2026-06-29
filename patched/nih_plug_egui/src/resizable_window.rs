@@ -3,7 +3,7 @@
 use std::ops::{BitOr, BitOrAssign};
 
 use egui_baseview::{
-	egui::{emath::GuiRounding, CursorIcon, InnerResponse, UiBuilder},
+	egui::{CursorIcon, InnerResponse, UiBuilder},
 	screen_cursor_position,
 };
 
@@ -98,12 +98,9 @@ impl ResizableWindow {
 			let corner_size = Vec2::splat(margin);
 			let corner_rect = Rect::from_min_size(ui_rect.max - corner_size, corner_size);
 
-			let mut corner_response = None;
-
 			if self.resize_edges.contains(ResizeEdges::BOTTOM_RIGHT) {
 				let response = ui.interact(corner_rect, self.id.with("bottom_right"), Sense::drag());
 				handle_resize_zone(ui, egui_state, &response, ResizeDirection::BottomRight, self.min_size);
-				corner_response = Some(response);
 			}
 
 			if self.resize_edges.contains(ResizeEdges::RIGHT) {
@@ -122,10 +119,6 @@ impl ResizableWindow {
 				);
 				let response = ui.interact(bottom_rect, self.id.with("bottom"), Sense::drag());
 				handle_resize_zone(ui, egui_state, &response, ResizeDirection::Bottom, self.min_size);
-			}
-
-			if let Some(corner_response) = corner_response {
-				paint_resize_corner(&content_ui, &corner_response);
 			}
 
 			ret
@@ -214,20 +207,5 @@ fn handle_resize_zone(
 
 	if response.drag_stopped() {
 		egui_state.resize_drag.store(None);
-	}
-}
-
-pub fn paint_resize_corner(ui: &Ui, response: &Response) {
-	let stroke = ui.style().interact(response).fg_stroke;
-
-	let painter = ui.painter();
-	let rect = response.rect.translate(-Vec2::splat(2.0)); // move away from the corner
-	let cp = rect.max.round_to_pixels(painter.pixels_per_point());
-
-	let mut w = 2.0;
-
-	while w <= rect.width() && w <= rect.height() {
-		painter.line_segment([pos2(cp.x - w, cp.y), pos2(cp.x, cp.y - w)], stroke);
-		w += 4.0;
 	}
 }
