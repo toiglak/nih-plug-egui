@@ -4,13 +4,14 @@ use crate::widgets::{self as ui_kit, palette};
 use nih_plug::prelude::*;
 use nih_plug_egui::{
 	create_egui_editor,
-	egui::{self, RichText, Stroke, Vec2},
+	egui::{self, RichText, Stroke, UiBuilder, Vec2},
 	resizable_window::ResizableWindow,
 	EguiState,
 };
 
 const GAIN_STEPS: usize = 24;
 const LAZY_ITEM_COUNT: usize = 2_000;
+const OUTER_PADDING: f32 = 14.0;
 
 #[derive(Default)]
 struct DiagnosticState {
@@ -141,39 +142,49 @@ impl Plugin for SimplePlugin {
 				handle_shortcuts(egui_ctx, setter, state, &params);
 
 				egui::CentralPanel::default()
-					.frame(
-						egui::Frame::default()
-							.fill(palette::APP_BG)
-							.inner_margin(egui::Margin::same(18)),
-					)
+					.frame(egui::Frame::default().fill(palette::APP_BG))
 					.show(egui_ctx, |ui| {
 						ResizableWindow::new("simple-egui-plugin-window")
 							.min_size(Vec2::new(760.0, 520.0))
+							.handle_margin(OUTER_PADDING)
 							.show(ui.ctx(), egui_state.as_ref(), |ui| {
-								ui.spacing_mut().item_spacing = Vec2::new(14.0, 14.0);
-								draw_header(ui, state, &params);
-								ui.add_space(2.0);
+								let container_rect = ui.max_rect().shrink(0.5);
+								ui.painter().rect(
+									container_rect,
+									10.0,
+									palette::PANEL_BG,
+									Stroke::new(1.0, palette::CARD_STROKE),
+									egui::StrokeKind::Inside,
+								);
 
-								egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-									ui.columns(3, |columns| {
-										columns[0].vertical(|ui| {
-											host_and_parameter_sync(ui, setter, &params);
-											animation_probe(ui, state, params.gain.value());
-											hover_and_cursors(ui, state);
-										});
+								let inner_rect = container_rect.shrink(18.0);
+								let mut content_ui = ui.new_child(UiBuilder::new().max_rect(inner_rect).layout(*ui.layout()));
+								content_ui.spacing_mut().item_spacing = Vec2::new(14.0, 14.0);
+								draw_header(&mut content_ui, state, &params);
+								content_ui.add_space(2.0);
 
-										columns[1].vertical(|ui| {
-											text_and_keyboard_probe(ui, state);
-											resize_scale_focus_probe(ui, state, egui_state.as_ref());
-											tooltip_probe(ui);
-										});
+								egui::ScrollArea::vertical()
+									.auto_shrink([false, false])
+									.show(&mut content_ui, |ui| {
+										ui.columns(3, |columns| {
+											columns[0].vertical(|ui| {
+												host_and_parameter_sync(ui, setter, &params);
+												animation_probe(ui, state, params.gain.value());
+												hover_and_cursors(ui, state);
+											});
 
-										columns[2].vertical(|ui| {
-											lazy_list_probe(ui, state);
-											manual_matrix(ui);
+											columns[1].vertical(|ui| {
+												text_and_keyboard_probe(ui, state);
+												resize_scale_focus_probe(ui, state, egui_state.as_ref());
+												tooltip_probe(ui);
+											});
+
+											columns[2].vertical(|ui| {
+												lazy_list_probe(ui, state);
+												manual_matrix(ui);
+											});
 										});
 									});
-								});
 							});
 					});
 			},
