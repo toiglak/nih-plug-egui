@@ -210,6 +210,8 @@ fn apply_theme(egui_ctx: &egui::Context) {
 	style.spacing.button_padding = Vec2::new(10.0, 7.0);
 	style.spacing.window_margin = egui::Margin::same(0);
 	style.spacing.slider_width = 180.0;
+	// Keep egui's default scroll input path. Forcing raw wheel deltas removes
+	// trackpad momentum, but it makes mouse-wheel scrolling visibly jagged.
 	style.visuals = egui::Visuals::dark();
 	style.visuals.panel_fill = APP_BG;
 	style.visuals.extreme_bg_color = INPUT_BG;
