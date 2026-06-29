@@ -88,8 +88,8 @@ pub struct EguiState {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ResizeDrag {
-	pub last_screen_pos: (f32, f32),
-	pub accumulated_size: (f32, f32),
+	pub start_screen_pos: (f32, f32),
+	pub start_size: (f32, f32),
 	pub last_requested_size: (u32, u32),
 }
 

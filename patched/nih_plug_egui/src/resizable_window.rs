@@ -53,8 +53,8 @@ impl ResizableWindow {
 				if let Some(screen_pos) = screen_cursor_position(ui.ctx()) {
 					let size = egui_state.size();
 					egui_state.resize_drag.store(Some(ResizeDrag {
-						last_screen_pos: (screen_pos.x, screen_pos.y),
-						accumulated_size: (size.0 as f32, size.1 as f32),
+						start_screen_pos: (screen_pos.x, screen_pos.y),
+						start_size: (size.0 as f32, size.1 as f32),
 						last_requested_size: size,
 					}));
 				}
@@ -63,16 +63,11 @@ impl ResizableWindow {
 			if corner_response.dragged() {
 				if let Some(screen_pos) = screen_cursor_position(ui.ctx()) {
 					if let Some(mut drag) = egui_state.resize_drag.load() {
-						let delta_x = screen_pos.x - drag.last_screen_pos.0;
-						let delta_y = screen_pos.y - drag.last_screen_pos.1;
-
-						drag.last_screen_pos = (screen_pos.x, screen_pos.y);
-						drag.accumulated_size.0 = (drag.accumulated_size.0 + delta_x).max(self.min_size.x);
-						drag.accumulated_size.1 = (drag.accumulated_size.1 + delta_y).max(self.min_size.y);
-
+						let desired_width = drag.start_size.0 + screen_pos.x - drag.start_screen_pos.0;
+						let desired_height = drag.start_size.1 + screen_pos.y - drag.start_screen_pos.1;
 						let requested_size = (
-							drag.accumulated_size.0.round() as u32,
-							drag.accumulated_size.1.round() as u32,
+							desired_width.max(self.min_size.x).round() as u32,
+							desired_height.max(self.min_size.y).round() as u32,
 						);
 
 						if requested_size != drag.last_requested_size {
@@ -84,8 +79,8 @@ impl ResizableWindow {
 					} else {
 						let size = egui_state.size();
 						egui_state.resize_drag.store(Some(ResizeDrag {
-							last_screen_pos: (screen_pos.x, screen_pos.y),
-							accumulated_size: (size.0 as f32, size.1 as f32),
+							start_screen_pos: (screen_pos.x, screen_pos.y),
+							start_size: (size.0 as f32, size.1 as f32),
 							last_requested_size: size,
 						}));
 					}
