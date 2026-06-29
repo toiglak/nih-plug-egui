@@ -417,6 +417,8 @@ where
 	}
 
 	fn on_event(&mut self, _window: &mut Window, event: Event) -> EventStatus {
+		let mut event_status = EventStatus::Captured;
+
 		match &event {
 			baseview::Event::Mouse(event) => match event {
 				baseview::MouseEvent::CursorMoved {
@@ -500,6 +502,12 @@ where
 			baseview::Event::Keyboard(event) => {
 				use keyboard_types::Code;
 
+				event_status = if self.egui_ctx.memory(|memory| memory.focused().is_some()) {
+					EventStatus::Captured
+				} else {
+					EventStatus::Ignored
+				};
+
 				let pressed = event.state == keyboard_types::KeyState::Down;
 
 				match event.code {
@@ -575,7 +583,7 @@ where
 			},
 		}
 
-		EventStatus::Captured
+		event_status
 	}
 }
 
