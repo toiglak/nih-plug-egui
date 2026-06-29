@@ -1,0 +1,8 @@
+bun.lockb
+Cargo.lock
+
+target
+example/target
+.DS_Store
+.vscode
+test.sh
