@@ -1,30 +1,16 @@
 use std::{collections::VecDeque, num::NonZeroU32, sync::Arc, time::Instant};
 
+use crate::widgets::{self as ui_kit, palette};
 use nih_plug::prelude::*;
 use nih_plug_egui::{
 	create_egui_editor,
-	egui::{self, Color32, FontId, RichText, Sense, Stroke, TextStyle, Vec2},
+	egui::{self, RichText, Stroke, Vec2},
 	resizable_window::ResizableWindow,
 	EguiState,
 };
 
 const GAIN_STEPS: usize = 24;
 const LAZY_ITEM_COUNT: usize = 2_000;
-const APP_BG: Color32 = Color32::from_rgb(10, 13, 18);
-const PANEL_BG: Color32 = Color32::from_rgb(14, 18, 25);
-const CARD_BG: Color32 = Color32::from_rgb(18, 23, 31);
-const CARD_BG_ALT: Color32 = Color32::from_rgb(21, 28, 38);
-const CARD_STROKE: Color32 = Color32::from_rgb(43, 54, 70);
-const CARD_STROKE_HOVER: Color32 = Color32::from_rgb(62, 83, 112);
-const TEXT: Color32 = Color32::from_rgb(232, 238, 246);
-const MUTED: Color32 = Color32::from_rgb(145, 156, 174);
-const SUBTLE: Color32 = Color32::from_rgb(94, 106, 126);
-const ACCENT: Color32 = Color32::from_rgb(36, 211, 238);
-const ACCENT_GREEN: Color32 = Color32::from_rgb(151, 230, 72);
-const ACCENT_ORANGE: Color32 = Color32::from_rgb(249, 137, 43);
-const BUTTON_BG: Color32 = Color32::from_rgb(30, 39, 53);
-const BUTTON_HOVER: Color32 = Color32::from_rgb(39, 52, 72);
-const INPUT_BG: Color32 = Color32::from_rgb(8, 11, 16);
 
 #[derive(Default)]
 struct DiagnosticState {
@@ -149,13 +135,17 @@ impl Plugin for SimplePlugin {
 			DiagnosticState::new(),
 			|_, _| {},
 			move |egui_ctx, setter, state| {
-				apply_theme(egui_ctx);
+				ui_kit::apply_theme(egui_ctx);
 				egui_ctx.request_repaint();
 				state.record_frame();
 				handle_shortcuts(egui_ctx, setter, state, &params);
 
 				egui::CentralPanel::default()
-					.frame(egui::Frame::default().fill(APP_BG).inner_margin(egui::Margin::same(18)))
+					.frame(
+						egui::Frame::default()
+							.fill(palette::APP_BG)
+							.inner_margin(egui::Margin::same(18)),
+					)
 					.show(egui_ctx, |ui| {
 						ResizableWindow::new("simple-egui-plugin-window")
 							.min_size(Vec2::new(760.0, 520.0))
@@ -204,91 +194,37 @@ impl Vst3Plugin for SimplePlugin {
 	const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = &[Vst3SubCategory::Fx];
 }
 
-fn apply_theme(egui_ctx: &egui::Context) {
-	let mut style = (*egui_ctx.style()).clone();
-	style.spacing.item_spacing = Vec2::new(10.0, 8.0);
-	style.spacing.button_padding = Vec2::new(10.0, 7.0);
-	style.spacing.window_margin = egui::Margin::same(0);
-	style.spacing.slider_width = 180.0;
-	// Keep egui's default scroll input path. Forcing raw wheel deltas removes
-	// trackpad momentum, but it makes mouse-wheel scrolling visibly jagged.
-	style.visuals = egui::Visuals::dark();
-	style.visuals.panel_fill = APP_BG;
-	style.visuals.extreme_bg_color = INPUT_BG;
-	style.visuals.faint_bg_color = CARD_BG_ALT;
-	style.visuals.window_fill = PANEL_BG;
-	style.visuals.window_corner_radius = egui::CornerRadius::same(8);
-	style.visuals.menu_corner_radius = egui::CornerRadius::same(8);
-	style.visuals.selection.bg_fill = Color32::from_rgb(18, 113, 140);
-	style.visuals.selection.stroke = Stroke::new(1.0, ACCENT);
-	style.visuals.hyperlink_color = ACCENT;
-	style.visuals.slider_trailing_fill = true;
-	style.visuals.button_frame = true;
-
-	for visuals in [
-		&mut style.visuals.widgets.noninteractive,
-		&mut style.visuals.widgets.inactive,
-		&mut style.visuals.widgets.hovered,
-		&mut style.visuals.widgets.active,
-		&mut style.visuals.widgets.open,
-	] {
-		visuals.corner_radius = egui::CornerRadius::same(6);
-		visuals.fg_stroke = Stroke::new(1.0, TEXT);
-	}
-
-	style.visuals.widgets.noninteractive.bg_fill = CARD_BG;
-	style.visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0, CARD_STROKE);
-	style.visuals.widgets.inactive.bg_fill = BUTTON_BG;
-	style.visuals.widgets.inactive.bg_stroke = Stroke::new(1.0, CARD_STROKE);
-	style.visuals.widgets.hovered.bg_fill = BUTTON_HOVER;
-	style.visuals.widgets.hovered.bg_stroke = Stroke::new(1.0, CARD_STROKE_HOVER);
-	style.visuals.widgets.active.bg_fill = Color32::from_rgb(23, 75, 92);
-	style.visuals.widgets.active.bg_stroke = Stroke::new(1.0, ACCENT);
-
-	style.text_styles.insert(TextStyle::Heading, FontId::proportional(24.0));
-	style.text_styles.insert(TextStyle::Body, FontId::proportional(14.0));
-	style.text_styles.insert(TextStyle::Button, FontId::proportional(13.0));
-	style.text_styles.insert(TextStyle::Small, FontId::proportional(11.0));
-
-	egui_ctx.set_style(style);
-}
-
 fn draw_header(ui: &mut egui::Ui, state: &DiagnosticState, params: &SimpleParams) {
 	egui::Frame::default()
-		.fill(PANEL_BG)
-		.stroke(Stroke::new(1.0, CARD_STROKE))
+		.fill(palette::PANEL_BG)
+		.stroke(Stroke::new(1.0, palette::CARD_STROKE))
 		.corner_radius(8)
 		.inner_margin(egui::Margin::symmetric(16, 14))
 		.show(ui, |ui| {
 			ui.horizontal(|ui| {
 				ui.vertical(|ui| {
-					ui.label(RichText::new("egui embed diagnostics").size(24.0).strong().color(TEXT));
+					ui.label(
+						RichText::new("egui embed diagnostics")
+							.size(24.0)
+							.strong()
+							.color(palette::TEXT),
+					);
 					ui.add_space(3.0);
 					ui.label(
 						RichText::new("Host integration probes for parameters, input, rendering, and window lifecycle")
 							.size(12.0)
-							.color(MUTED),
+							.color(palette::MUTED),
 					);
 				});
 
 				ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-					pill(ui, "repaint", state.frame_rate_text.clone(), ACCENT_GREEN);
-					pill(ui, "gain", params.gain.to_string(), ACCENT);
+					ui.add(ui_kit::Pill::new(
+						"repaint",
+						state.frame_rate_text.clone(),
+						palette::ACCENT_GREEN,
+					));
+					ui.add(ui_kit::Pill::new("gain", params.gain.to_string(), palette::ACCENT));
 				});
-			});
-		});
-}
-
-fn pill(ui: &mut egui::Ui, label: &str, value: impl Into<String>, accent: Color32) {
-	egui::Frame::default()
-		.fill(Color32::from_rgb(19, 27, 37))
-		.stroke(Stroke::new(1.0, Color32::from_rgb(46, 61, 80)))
-		.corner_radius(8)
-		.inner_margin(egui::Margin::symmetric(10, 6))
-		.show(ui, |ui| {
-			ui.horizontal(|ui| {
-				ui.label(RichText::new(label).size(10.0).color(SUBTLE).strong());
-				ui.label(RichText::new(value.into()).size(12.0).color(accent).strong());
 			});
 		});
 }
@@ -334,67 +270,48 @@ fn set_gain_normalized(setter: &ParamSetter, params: &SimpleParams, normalized: 
 }
 
 fn section(ui: &mut egui::Ui, title: &str, body: impl FnOnce(&mut egui::Ui)) {
-	egui::Frame::default()
-		.fill(CARD_BG)
-		.stroke(Stroke::new(1.0, CARD_STROKE))
-		.corner_radius(8)
-		.inner_margin(egui::Margin::same(14))
-		.show(ui, |ui| {
-			ui.set_width(ui.available_width());
-			ui.label(RichText::new(title).size(15.0).strong().color(TEXT));
-			ui.add_space(8.0);
-			body(ui);
-		});
-	ui.add_space(14.0);
+	ui_kit::Card::new(title).show(ui, body);
 }
 
 fn status_chip(ui: &mut egui::Ui, label: &str, value: impl Into<String>) {
-	let value = value.into();
-	egui::Frame::default()
-		.fill(Color32::from_rgb(15, 20, 28))
-		.corner_radius(6)
-		.inner_margin(egui::Margin::symmetric(9, 6))
-		.show(ui, |ui| {
-			ui.horizontal(|ui| {
-				ui.label(RichText::new(label).size(11.0).color(SUBTLE).strong());
-				ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-					ui.label(RichText::new(value).size(11.0).color(MUTED));
-				});
-			});
-		});
+	ui.add(ui_kit::StatusRow::new(label, value));
 }
 
 fn action_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
-	ui.add(
-		egui::Button::new(RichText::new(label).size(13.0).color(TEXT).strong())
-			.fill(BUTTON_BG)
-			.stroke(Stroke::new(1.0, CARD_STROKE))
-			.corner_radius(6)
-			.min_size(Vec2::new(54.0, 32.0)),
-	)
+	ui.add(ui_kit::ActionButton::new(label))
 }
 
 fn host_and_parameter_sync(ui: &mut egui::Ui, setter: &ParamSetter, params: &SimpleParams) {
 	section(ui, "Host and parameter sync", |ui| {
-		let normalized = params.gain.value().clamp(0.0, 1.0);
+		let mut normalized = params.gain.value().clamp(0.0, 1.0);
 
 		ui.horizontal(|ui| {
 			ui.vertical(|ui| {
-				ui.label(RichText::new("GAIN").size(11.0).color(SUBTLE).strong());
-				ui.label(RichText::new(params.gain.to_string()).size(28.0).color(ACCENT));
+				ui.label(RichText::new("GAIN").size(11.0).color(palette::SUBTLE).strong());
+				ui.label(RichText::new(params.gain.to_string()).size(28.0).color(palette::ACCENT));
 			});
 			ui.with_layout(egui::Layout::right_to_left(egui::Align::BOTTOM), |ui| {
 				ui.label(
 					RichText::new(format!("host {:.0}%", normalized * 100.0))
 						.size(12.0)
-						.color(ACCENT_GREEN)
+						.color(palette::ACCENT_GREEN)
 						.strong(),
 				);
 			});
 		});
 
-		normalized_slider(ui, setter, params, normalized);
-		gain_meter(ui, setter, params, normalized);
+		let mut slider_value = normalized;
+		if ui.add(ui_kit::NormalizedSlider::new(&mut slider_value)).changed() {
+			set_gain_normalized(setter, params, slider_value);
+			normalized = slider_value;
+		}
+		let mut meter_value = normalized;
+		if ui
+			.add(ui_kit::SegmentedMeter::new(&mut meter_value).steps(GAIN_STEPS))
+			.changed()
+		{
+			set_gain_normalized(setter, params, meter_value);
+		}
 
 		ui.horizontal(|ui| {
 			if action_button(ui, "-5%").clicked() {
@@ -410,106 +327,9 @@ fn host_and_parameter_sync(ui: &mut egui::Ui, setter: &ParamSetter, params: &Sim
 	});
 }
 
-fn normalized_slider(ui: &mut egui::Ui, setter: &ParamSetter, params: &SimpleParams, normalized: f32) {
-	let desired_size = Vec2::new(ui.available_width(), 28.0);
-	let (rect, response) = ui.allocate_exact_size(desired_size, Sense::click_and_drag());
-	let painter = ui.painter_at(rect);
-	let track_rect = egui::Rect::from_min_max(
-		egui::pos2(rect.left(), rect.center().y - 4.0),
-		egui::pos2(rect.right(), rect.center().y + 4.0),
-	);
-	let fill_rect = egui::Rect::from_min_max(
-		track_rect.left_top(),
-		egui::pos2(track_rect.left() + track_rect.width() * normalized, track_rect.bottom()),
-	);
-
-	if let Some(position) = response
-		.interact_pointer_pos()
-		.filter(|_| response.clicked() || response.dragged())
-	{
-		set_gain_normalized(
-			setter,
-			params,
-			((position.x - rect.left()) / rect.width()).clamp(0.0, 1.0),
-		);
-	}
-
-	painter.rect_filled(track_rect, 5.0, Color32::from_rgb(33, 42, 55));
-	painter.rect_filled(fill_rect, 5.0, ACCENT);
-	let handle_x = track_rect.left() + track_rect.width() * normalized;
-	painter.circle_filled(egui::pos2(handle_x, track_rect.center().y), 7.0, TEXT);
-	painter.circle_stroke(
-		egui::pos2(handle_x, track_rect.center().y),
-		7.0,
-		Stroke::new(2.0, ACCENT),
-	);
-}
-
-fn gain_meter(ui: &mut egui::Ui, setter: &ParamSetter, params: &SimpleParams, normalized: f32) {
-	let desired_size = Vec2::new(ui.available_width(), 86.0);
-	let (rect, response) = ui.allocate_exact_size(desired_size, Sense::click_and_drag());
-	let painter = ui.painter_at(rect);
-	let gap = 3.0;
-	let step_width = ((rect.width() - gap * (GAIN_STEPS - 1) as f32) / GAIN_STEPS as f32).max(4.0);
-
-	if let Some(position) = response
-		.interact_pointer_pos()
-		.filter(|_| response.clicked() || response.dragged())
-	{
-		let normalized = ((position.x - rect.left()) / rect.width()).clamp(0.0, 1.0);
-		set_gain_normalized(setter, params, normalized);
-	}
-
-	for step in 0..GAIN_STEPS {
-		let step_normalized = step as f32 / (GAIN_STEPS - 1) as f32;
-		let height = 18.0 + 52.0 * step_normalized;
-		let left = rect.left() + step as f32 * (step_width + gap);
-		let bottom = rect.bottom() - 8.0;
-		let bar_rect = egui::Rect::from_min_size(egui::pos2(left, bottom - height), Vec2::new(step_width, height));
-		let color = if step_normalized <= normalized {
-			active_meter_color(step_normalized)
-		} else {
-			Color32::from_rgb(37, 46, 62)
-		};
-		painter.rect_filled(bar_rect, 3.0, color);
-	}
-}
-
-fn active_meter_color(step_ratio: f32) -> Color32 {
-	if step_ratio < 0.5 {
-		let t = step_ratio / 0.5;
-		Color32::from_rgb((34.0 + 120.0 * t) as u8, 211, (238.0 - 120.0 * t) as u8)
-	} else {
-		let t = (step_ratio - 0.5) / 0.5;
-		Color32::from_rgb(
-			(ACCENT_GREEN.r() as f32 + (ACCENT_ORANGE.r() as f32 - ACCENT_GREEN.r() as f32) * t) as u8,
-			(ACCENT_GREEN.g() as f32 + (ACCENT_ORANGE.g() as f32 - ACCENT_GREEN.g() as f32) * t) as u8,
-			(ACCENT_GREEN.b() as f32 + (ACCENT_ORANGE.b() as f32 - ACCENT_GREEN.b() as f32) * t) as u8,
-		)
-	}
-}
-
 fn animation_probe(ui: &mut egui::Ui, state: &DiagnosticState, gain: f32) {
 	section(ui, "Animation and presentation", |ui| {
-		let desired_size = Vec2::new(ui.available_width(), 72.0);
-		let (rect, _) = ui.allocate_exact_size(desired_size, Sense::hover());
-		let painter = ui.painter_at(rect);
-		let phase = state.frame_count as f32 * 0.08;
-		painter.rect_filled(rect, 8.0, Color32::from_rgb(12, 17, 24));
-
-		for i in 0..12 {
-			let wave = (phase + i as f32 * 0.45).sin().abs();
-			let height = 10.0 + 48.0 * wave * gain.max(0.15);
-			let x = rect.left() + 12.0 + i as f32 * 15.0;
-			let bar = egui::Rect::from_min_size(egui::pos2(x, rect.bottom() - height - 8.0), Vec2::new(7.0, height));
-			let color = match i % 3 {
-				0 => Color32::from_rgb(34, 211, 238),
-				1 => Color32::from_rgb(163, 230, 53),
-				_ => Color32::from_rgb(249, 115, 22),
-			};
-			painter.rect_filled(bar, 4.0, color);
-		}
-
+		ui.add(ui_kit::AnimationBars::new(state.frame_count, gain));
 		status_chip(ui, "Expected", "bars repaint continuously");
 		status_chip(ui, "Frame probe", state.frame_rate_text.clone());
 	});
@@ -538,39 +358,13 @@ fn hover_pad(
 	cursor: egui::CursorIcon,
 	width: f32,
 ) {
-	let (rect, response) = ui.allocate_exact_size(Vec2::new(width, 44.0), Sense::hover());
-	let color = if response.hovered() {
-		ui.output_mut(|output| output.cursor_icon = cursor);
+	let response = ui.add(ui_kit::HoverPad::new(label, cursor, width));
+	if response.hovered() {
 		state.hover_count = state.hover_count.saturating_add(1);
 		if let Some(position) = response.hover_pos() {
 			state.last_mouse = format!("x={:.0} y={:.0}", position.x, position.y);
 		}
-		Color32::from_rgb(31, 48, 71)
-	} else {
-		Color32::from_rgb(18, 26, 38)
-	};
-
-	ui.painter().rect(
-		rect,
-		8.0,
-		color,
-		Stroke::new(
-			1.0,
-			if response.hovered() {
-				CARD_STROKE_HOVER
-			} else {
-				CARD_STROKE
-			},
-		),
-		egui::StrokeKind::Inside,
-	);
-	ui.painter().text(
-		rect.center(),
-		egui::Align2::CENTER_CENTER,
-		label,
-		egui::FontId::proportional(12.0),
-		TEXT,
-	);
+	}
 }
 
 fn text_and_keyboard_probe(ui: &mut egui::Ui, state: &mut DiagnosticState) {
@@ -614,11 +408,9 @@ fn resize_scale_focus_probe(ui: &mut egui::Ui, state: &DiagnosticState, egui_sta
 
 fn tooltip_probe(ui: &mut egui::Ui) {
 	section(ui, "Tooltip and popup positioning", |ui| {
-		ui.add_sized(
-			[ui.available_width(), 46.0],
-			egui::Button::new(RichText::new("Hover for tooltip").color(TEXT).strong())
-				.fill(BUTTON_BG)
-				.stroke(Stroke::new(1.0, CARD_STROKE))
+		ui.add(
+			ui_kit::ActionButton::new("Hover for tooltip")
+				.min_size(Vec2::new(ui.available_width(), 46.0))
 				.corner_radius(8),
 		)
 		.on_hover_text("Tooltip rendered inside embedded egui");
@@ -636,7 +428,7 @@ fn lazy_list_probe(ui: &mut egui::Ui, state: &mut DiagnosticState) {
 			.show_rows(ui, row_height, LAZY_ITEM_COUNT, |ui, range| {
 				visible = (range.start, range.end);
 				for ix in range {
-					let response = lazy_row(ui, ix, state.selected_lazy_item == Some(ix));
+					let response = ui.add(ui_kit::LazyRow::new(ix, state.selected_lazy_item == Some(ix)));
 					if response.clicked() {
 						state.selected_lazy_item = Some(ix);
 					}
@@ -672,53 +464,6 @@ fn lazy_list_probe(ui: &mut egui::Ui, state: &mut DiagnosticState) {
 				.unwrap_or_else(|| "none".to_string()),
 		);
 	});
-}
-
-fn lazy_row(ui: &mut egui::Ui, ix: usize, selected: bool) -> egui::Response {
-	let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 30.0), Sense::click());
-	let hovered = response.hovered();
-	let fill = if selected {
-		Color32::from_rgb(20, 92, 118)
-	} else if hovered {
-		Color32::from_rgb(25, 34, 48)
-	} else if ix % 2 == 0 {
-		Color32::from_rgb(15, 20, 28)
-	} else {
-		Color32::from_rgb(13, 18, 25)
-	};
-	let stroke = if selected {
-		Stroke::new(1.0, ACCENT)
-	} else {
-		Stroke::new(1.0, Color32::TRANSPARENT)
-	};
-
-	ui.painter().rect(
-		rect.shrink2(Vec2::new(0.0, 1.0)),
-		6.0,
-		fill,
-		stroke,
-		egui::StrokeKind::Inside,
-	);
-	ui.painter().text(
-		egui::pos2(rect.left() + 10.0, rect.center().y),
-		egui::Align2::LEFT_CENTER,
-		format!("Lazy row {ix}"),
-		FontId::proportional(13.0),
-		if selected { Color32::WHITE } else { TEXT },
-	);
-	ui.painter().text(
-		egui::pos2(rect.right() - 10.0, rect.center().y),
-		egui::Align2::RIGHT_CENTER,
-		format!("#{ix:04}"),
-		FontId::monospace(12.0),
-		if selected {
-			Color32::from_rgb(206, 244, 255)
-		} else {
-			MUTED
-		},
-	);
-
-	response
 }
 
 fn manual_matrix(ui: &mut egui::Ui) {

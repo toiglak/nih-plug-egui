@@ -1,4 +1,5 @@
 pub mod simple_plugin;
+pub mod widgets;
 
 pub use simple_plugin::SimplePlugin;
 
