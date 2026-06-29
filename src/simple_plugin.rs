@@ -3,13 +3,28 @@ use std::{collections::VecDeque, num::NonZeroU32, sync::Arc, time::Instant};
 use nih_plug::prelude::*;
 use nih_plug_egui::{
 	create_egui_editor,
-	egui::{self, Color32, RichText, Sense, Stroke, Vec2},
+	egui::{self, Color32, FontId, RichText, Sense, Stroke, TextStyle, Vec2},
 	resizable_window::ResizableWindow,
-	widgets, EguiState,
+	EguiState,
 };
 
 const GAIN_STEPS: usize = 24;
 const LAZY_ITEM_COUNT: usize = 2_000;
+const APP_BG: Color32 = Color32::from_rgb(10, 13, 18);
+const PANEL_BG: Color32 = Color32::from_rgb(14, 18, 25);
+const CARD_BG: Color32 = Color32::from_rgb(18, 23, 31);
+const CARD_BG_ALT: Color32 = Color32::from_rgb(21, 28, 38);
+const CARD_STROKE: Color32 = Color32::from_rgb(43, 54, 70);
+const CARD_STROKE_HOVER: Color32 = Color32::from_rgb(62, 83, 112);
+const TEXT: Color32 = Color32::from_rgb(232, 238, 246);
+const MUTED: Color32 = Color32::from_rgb(145, 156, 174);
+const SUBTLE: Color32 = Color32::from_rgb(94, 106, 126);
+const ACCENT: Color32 = Color32::from_rgb(36, 211, 238);
+const ACCENT_GREEN: Color32 = Color32::from_rgb(151, 230, 72);
+const ACCENT_ORANGE: Color32 = Color32::from_rgb(249, 137, 43);
+const BUTTON_BG: Color32 = Color32::from_rgb(30, 39, 53);
+const BUTTON_HOVER: Color32 = Color32::from_rgb(39, 52, 72);
+const INPUT_BG: Color32 = Color32::from_rgb(8, 11, 16);
 
 #[derive(Default)]
 struct DiagnosticState {
@@ -134,42 +149,41 @@ impl Plugin for SimplePlugin {
 			DiagnosticState::new(),
 			|_, _| {},
 			move |egui_ctx, setter, state| {
+				apply_theme(egui_ctx);
 				egui_ctx.request_repaint();
 				state.record_frame();
 				handle_shortcuts(egui_ctx, setter, state, &params);
 
 				egui::CentralPanel::default()
-					.frame(egui::Frame::default().inner_margin(egui::Margin::same(12)))
+					.frame(egui::Frame::default().fill(APP_BG).inner_margin(egui::Margin::same(18)))
 					.show(egui_ctx, |ui| {
 						ResizableWindow::new("simple-egui-plugin-window")
 							.min_size(Vec2::new(760.0, 520.0))
 							.show(ui.ctx(), egui_state.as_ref(), |ui| {
-								ui.spacing_mut().item_spacing = Vec2::splat(10.0);
-								ui.heading("egui embed diagnostics");
+								ui.spacing_mut().item_spacing = Vec2::new(14.0, 14.0);
+								draw_header(ui, state, &params);
+								ui.add_space(2.0);
 
-								egui::Grid::new("diagnostics-grid")
-									.num_columns(3)
-									.spacing(Vec2::new(12.0, 10.0))
-									.show(ui, |ui| {
-										ui.vertical(|ui| {
+								egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+									ui.columns(3, |columns| {
+										columns[0].vertical(|ui| {
 											host_and_parameter_sync(ui, setter, &params);
 											animation_probe(ui, state, params.gain.value());
 											hover_and_cursors(ui, state);
 										});
 
-										ui.vertical(|ui| {
+										columns[1].vertical(|ui| {
 											text_and_keyboard_probe(ui, state);
 											resize_scale_focus_probe(ui, state, egui_state.as_ref());
 											tooltip_probe(ui);
 										});
 
-										ui.vertical(|ui| {
+										columns[2].vertical(|ui| {
 											lazy_list_probe(ui, state);
 											manual_matrix(ui);
 										});
-
-										ui.end_row();
 									});
+								});
 							});
 					});
 			},
@@ -188,6 +202,93 @@ impl ClapPlugin for SimplePlugin {
 impl Vst3Plugin for SimplePlugin {
 	const VST3_CLASS_ID: [u8; 16] = *b"SimpleEguiPlugin";
 	const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = &[Vst3SubCategory::Fx];
+}
+
+fn apply_theme(egui_ctx: &egui::Context) {
+	let mut style = (*egui_ctx.style()).clone();
+	style.spacing.item_spacing = Vec2::new(10.0, 8.0);
+	style.spacing.button_padding = Vec2::new(10.0, 7.0);
+	style.spacing.window_margin = egui::Margin::same(0);
+	style.spacing.slider_width = 180.0;
+	style.visuals = egui::Visuals::dark();
+	style.visuals.panel_fill = APP_BG;
+	style.visuals.extreme_bg_color = INPUT_BG;
+	style.visuals.faint_bg_color = CARD_BG_ALT;
+	style.visuals.window_fill = PANEL_BG;
+	style.visuals.window_corner_radius = egui::CornerRadius::same(8);
+	style.visuals.menu_corner_radius = egui::CornerRadius::same(8);
+	style.visuals.selection.bg_fill = Color32::from_rgb(18, 113, 140);
+	style.visuals.selection.stroke = Stroke::new(1.0, ACCENT);
+	style.visuals.hyperlink_color = ACCENT;
+	style.visuals.slider_trailing_fill = true;
+	style.visuals.button_frame = true;
+
+	for visuals in [
+		&mut style.visuals.widgets.noninteractive,
+		&mut style.visuals.widgets.inactive,
+		&mut style.visuals.widgets.hovered,
+		&mut style.visuals.widgets.active,
+		&mut style.visuals.widgets.open,
+	] {
+		visuals.corner_radius = egui::CornerRadius::same(6);
+		visuals.fg_stroke = Stroke::new(1.0, TEXT);
+	}
+
+	style.visuals.widgets.noninteractive.bg_fill = CARD_BG;
+	style.visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0, CARD_STROKE);
+	style.visuals.widgets.inactive.bg_fill = BUTTON_BG;
+	style.visuals.widgets.inactive.bg_stroke = Stroke::new(1.0, CARD_STROKE);
+	style.visuals.widgets.hovered.bg_fill = BUTTON_HOVER;
+	style.visuals.widgets.hovered.bg_stroke = Stroke::new(1.0, CARD_STROKE_HOVER);
+	style.visuals.widgets.active.bg_fill = Color32::from_rgb(23, 75, 92);
+	style.visuals.widgets.active.bg_stroke = Stroke::new(1.0, ACCENT);
+
+	style.text_styles.insert(TextStyle::Heading, FontId::proportional(24.0));
+	style.text_styles.insert(TextStyle::Body, FontId::proportional(14.0));
+	style.text_styles.insert(TextStyle::Button, FontId::proportional(13.0));
+	style.text_styles.insert(TextStyle::Small, FontId::proportional(11.0));
+
+	egui_ctx.set_style(style);
+}
+
+fn draw_header(ui: &mut egui::Ui, state: &DiagnosticState, params: &SimpleParams) {
+	egui::Frame::default()
+		.fill(PANEL_BG)
+		.stroke(Stroke::new(1.0, CARD_STROKE))
+		.corner_radius(8)
+		.inner_margin(egui::Margin::symmetric(16, 14))
+		.show(ui, |ui| {
+			ui.horizontal(|ui| {
+				ui.vertical(|ui| {
+					ui.label(RichText::new("egui embed diagnostics").size(24.0).strong().color(TEXT));
+					ui.add_space(3.0);
+					ui.label(
+						RichText::new("Host integration probes for parameters, input, rendering, and window lifecycle")
+							.size(12.0)
+							.color(MUTED),
+					);
+				});
+
+				ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+					pill(ui, "repaint", state.frame_rate_text.clone(), ACCENT_GREEN);
+					pill(ui, "gain", params.gain.to_string(), ACCENT);
+				});
+			});
+		});
+}
+
+fn pill(ui: &mut egui::Ui, label: &str, value: impl Into<String>, accent: Color32) {
+	egui::Frame::default()
+		.fill(Color32::from_rgb(19, 27, 37))
+		.stroke(Stroke::new(1.0, Color32::from_rgb(46, 61, 80)))
+		.corner_radius(8)
+		.inner_margin(egui::Margin::symmetric(10, 6))
+		.show(ui, |ui| {
+			ui.horizontal(|ui| {
+				ui.label(RichText::new(label).size(10.0).color(SUBTLE).strong());
+				ui.label(RichText::new(value.into()).size(12.0).color(accent).strong());
+			});
+		});
 }
 
 fn handle_shortcuts(
@@ -231,23 +332,44 @@ fn set_gain_normalized(setter: &ParamSetter, params: &SimpleParams, normalized: 
 }
 
 fn section(ui: &mut egui::Ui, title: &str, body: impl FnOnce(&mut egui::Ui)) {
-	egui::Frame::group(ui.style())
-		.inner_margin(egui::Margin::same(10))
+	egui::Frame::default()
+		.fill(CARD_BG)
+		.stroke(Stroke::new(1.0, CARD_STROKE))
+		.corner_radius(8)
+		.inner_margin(egui::Margin::same(14))
 		.show(ui, |ui| {
-			ui.set_min_width(250.0);
-			ui.label(RichText::new(title).strong().color(Color32::from_rgb(174, 183, 199)));
-			ui.add_space(4.0);
+			ui.set_width(ui.available_width());
+			ui.label(RichText::new(title).size(15.0).strong().color(TEXT));
+			ui.add_space(8.0);
 			body(ui);
 		});
+	ui.add_space(14.0);
 }
 
 fn status_chip(ui: &mut egui::Ui, label: &str, value: impl Into<String>) {
-	ui.horizontal(|ui| {
-		ui.label(RichText::new(label).small().color(Color32::from_rgb(139, 149, 167)));
-		ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-			ui.label(RichText::new(value.into()).small());
+	let value = value.into();
+	egui::Frame::default()
+		.fill(Color32::from_rgb(15, 20, 28))
+		.corner_radius(6)
+		.inner_margin(egui::Margin::symmetric(9, 6))
+		.show(ui, |ui| {
+			ui.horizontal(|ui| {
+				ui.label(RichText::new(label).size(11.0).color(SUBTLE).strong());
+				ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+					ui.label(RichText::new(value).size(11.0).color(MUTED));
+				});
+			});
 		});
-	});
+}
+
+fn action_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
+	ui.add(
+		egui::Button::new(RichText::new(label).size(13.0).color(TEXT).strong())
+			.fill(BUTTON_BG)
+			.stroke(Stroke::new(1.0, CARD_STROKE))
+			.corner_radius(6)
+			.min_size(Vec2::new(54.0, 32.0)),
+	)
 }
 
 fn host_and_parameter_sync(ui: &mut egui::Ui, setter: &ParamSetter, params: &SimpleParams) {
@@ -256,37 +378,69 @@ fn host_and_parameter_sync(ui: &mut egui::Ui, setter: &ParamSetter, params: &Sim
 
 		ui.horizontal(|ui| {
 			ui.vertical(|ui| {
-				ui.label(RichText::new("GAIN").small().color(Color32::from_rgb(139, 149, 167)));
-				ui.label(
-					RichText::new(params.gain.to_string())
-						.size(28.0)
-						.color(Color32::from_rgb(34, 211, 238)),
-				);
+				ui.label(RichText::new("GAIN").size(11.0).color(SUBTLE).strong());
+				ui.label(RichText::new(params.gain.to_string()).size(28.0).color(ACCENT));
 			});
 			ui.with_layout(egui::Layout::right_to_left(egui::Align::BOTTOM), |ui| {
 				ui.label(
 					RichText::new(format!("host {:.0}%", normalized * 100.0))
-						.small()
-						.color(Color32::from_rgb(134, 239, 172)),
+						.size(12.0)
+						.color(ACCENT_GREEN)
+						.strong(),
 				);
 			});
 		});
 
-		ui.add(widgets::ParamSlider::for_param(&params.gain, setter));
+		normalized_slider(ui, setter, params, normalized);
 		gain_meter(ui, setter, params, normalized);
 
 		ui.horizontal(|ui| {
-			if ui.button("-5%").clicked() {
+			if action_button(ui, "-5%").clicked() {
 				set_gain_normalized(setter, params, normalized - 0.05);
 			}
-			if ui.button("Reset").clicked() {
+			if action_button(ui, "Reset").clicked() {
 				set_gain_normalized(setter, params, params.gain.default_normalized_value());
 			}
-			if ui.button("+5%").clicked() {
+			if action_button(ui, "+5%").clicked() {
 				set_gain_normalized(setter, params, normalized + 0.05);
 			}
 		});
 	});
+}
+
+fn normalized_slider(ui: &mut egui::Ui, setter: &ParamSetter, params: &SimpleParams, normalized: f32) {
+	let desired_size = Vec2::new(ui.available_width(), 28.0);
+	let (rect, response) = ui.allocate_exact_size(desired_size, Sense::click_and_drag());
+	let painter = ui.painter_at(rect);
+	let track_rect = egui::Rect::from_min_max(
+		egui::pos2(rect.left(), rect.center().y - 4.0),
+		egui::pos2(rect.right(), rect.center().y + 4.0),
+	);
+	let fill_rect = egui::Rect::from_min_max(
+		track_rect.left_top(),
+		egui::pos2(track_rect.left() + track_rect.width() * normalized, track_rect.bottom()),
+	);
+
+	if let Some(position) = response
+		.interact_pointer_pos()
+		.filter(|_| response.clicked() || response.dragged())
+	{
+		set_gain_normalized(
+			setter,
+			params,
+			((position.x - rect.left()) / rect.width()).clamp(0.0, 1.0),
+		);
+	}
+
+	painter.rect_filled(track_rect, 5.0, Color32::from_rgb(33, 42, 55));
+	painter.rect_filled(fill_rect, 5.0, ACCENT);
+	let handle_x = track_rect.left() + track_rect.width() * normalized;
+	painter.circle_filled(egui::pos2(handle_x, track_rect.center().y), 7.0, TEXT);
+	painter.circle_stroke(
+		egui::pos2(handle_x, track_rect.center().y),
+		7.0,
+		Stroke::new(2.0, ACCENT),
+	);
 }
 
 fn gain_meter(ui: &mut egui::Ui, setter: &ParamSetter, params: &SimpleParams, normalized: f32) {
@@ -313,7 +467,7 @@ fn gain_meter(ui: &mut egui::Ui, setter: &ParamSetter, params: &SimpleParams, no
 		let color = if step_normalized <= normalized {
 			active_meter_color(step_normalized)
 		} else {
-			Color32::from_rgb(41, 49, 66)
+			Color32::from_rgb(37, 46, 62)
 		};
 		painter.rect_filled(bar_rect, 3.0, color);
 	}
@@ -325,7 +479,11 @@ fn active_meter_color(step_ratio: f32) -> Color32 {
 		Color32::from_rgb((34.0 + 120.0 * t) as u8, 211, (238.0 - 120.0 * t) as u8)
 	} else {
 		let t = (step_ratio - 0.5) / 0.5;
-		Color32::from_rgb((163.0 + 86.0 * t) as u8, (230.0 - 115.0 * t) as u8, 53)
+		Color32::from_rgb(
+			(ACCENT_GREEN.r() as f32 + (ACCENT_ORANGE.r() as f32 - ACCENT_GREEN.r() as f32) * t) as u8,
+			(ACCENT_GREEN.g() as f32 + (ACCENT_ORANGE.g() as f32 - ACCENT_GREEN.g() as f32) * t) as u8,
+			(ACCENT_GREEN.b() as f32 + (ACCENT_ORANGE.b() as f32 - ACCENT_GREEN.b() as f32) * t) as u8,
+		)
 	}
 }
 
@@ -335,6 +493,7 @@ fn animation_probe(ui: &mut egui::Ui, state: &DiagnosticState, gain: f32) {
 		let (rect, _) = ui.allocate_exact_size(desired_size, Sense::hover());
 		let painter = ui.painter_at(rect);
 		let phase = state.frame_count as f32 * 0.08;
+		painter.rect_filled(rect, 8.0, Color32::from_rgb(12, 17, 24));
 
 		for i in 0..12 {
 			let wave = (phase + i as f32 * 0.45).sin().abs();
@@ -356,40 +515,51 @@ fn animation_probe(ui: &mut egui::Ui, state: &DiagnosticState, gain: f32) {
 
 fn hover_and_cursors(ui: &mut egui::Ui, state: &mut DiagnosticState) {
 	section(ui, "Hover and cursors", |ui| {
-		egui::Grid::new("hover-cursor-grid")
-			.num_columns(2)
-			.spacing(Vec2::splat(8.0))
-			.show(ui, |ui| {
-				hover_pad(ui, state, "pointer", egui::CursorIcon::PointingHand);
-				hover_pad(ui, state, "text", egui::CursorIcon::Text);
-				ui.end_row();
-				hover_pad(ui, state, "crosshair", egui::CursorIcon::Crosshair);
-				hover_pad(ui, state, "ew-resize", egui::CursorIcon::ResizeHorizontal);
-				ui.end_row();
-			});
+		let pad_width = ((ui.available_width() - 8.0) / 2.0).max(96.0);
+		ui.horizontal(|ui| {
+			hover_pad(ui, state, "pointer", egui::CursorIcon::PointingHand, pad_width);
+			hover_pad(ui, state, "text", egui::CursorIcon::Text, pad_width);
+		});
+		ui.horizontal(|ui| {
+			hover_pad(ui, state, "crosshair", egui::CursorIcon::Crosshair, pad_width);
+			hover_pad(ui, state, "ew-resize", egui::CursorIcon::ResizeHorizontal, pad_width);
+		});
 		status_chip(ui, "Mouse", state.last_mouse.clone());
 		status_chip(ui, "Hover moves", state.hover_count.to_string());
 	});
 }
 
-fn hover_pad(ui: &mut egui::Ui, state: &mut DiagnosticState, label: &'static str, cursor: egui::CursorIcon) {
-	let (rect, response) = ui.allocate_exact_size(Vec2::new(118.0, 42.0), Sense::hover());
+fn hover_pad(
+	ui: &mut egui::Ui,
+	state: &mut DiagnosticState,
+	label: &'static str,
+	cursor: egui::CursorIcon,
+	width: f32,
+) {
+	let (rect, response) = ui.allocate_exact_size(Vec2::new(width, 44.0), Sense::hover());
 	let color = if response.hovered() {
 		ui.output_mut(|output| output.cursor_icon = cursor);
 		state.hover_count = state.hover_count.saturating_add(1);
 		if let Some(position) = response.hover_pos() {
 			state.last_mouse = format!("x={:.0} y={:.0}", position.x, position.y);
 		}
-		Color32::from_rgb(38, 54, 80)
+		Color32::from_rgb(31, 48, 71)
 	} else {
-		Color32::from_rgb(21, 28, 41)
+		Color32::from_rgb(18, 26, 38)
 	};
 
 	ui.painter().rect(
 		rect,
-		6.0,
+		8.0,
 		color,
-		Stroke::new(1.0, Color32::from_rgb(42, 52, 72)),
+		Stroke::new(
+			1.0,
+			if response.hovered() {
+				CARD_STROKE_HOVER
+			} else {
+				CARD_STROKE
+			},
+		),
 		egui::StrokeKind::Inside,
 	);
 	ui.painter().text(
@@ -397,7 +567,7 @@ fn hover_pad(ui: &mut egui::Ui, state: &mut DiagnosticState, label: &'static str
 		egui::Align2::CENTER_CENTER,
 		label,
 		egui::FontId::proportional(12.0),
-		Color32::from_rgb(205, 214, 229),
+		TEXT,
 	);
 }
 
@@ -410,11 +580,11 @@ fn text_and_keyboard_probe(ui: &mut egui::Ui, state: &mut DiagnosticState) {
 		);
 
 		ui.horizontal(|ui| {
-			if ui.button("Copy").clicked() {
+			if action_button(ui, "Copy").clicked() {
 				ui.ctx().copy_text(state.text_value.clone());
 				state.clipboard_status = format!("Copied {} chars", state.text_value.chars().count());
 			}
-			if ui.button("Clear").clicked() {
+			if action_button(ui, "Clear").clicked() {
 				state.text_value.clear();
 				state.clipboard_status = "Cleared text".to_string();
 			}
@@ -442,15 +612,21 @@ fn resize_scale_focus_probe(ui: &mut egui::Ui, state: &DiagnosticState, egui_sta
 
 fn tooltip_probe(ui: &mut egui::Ui) {
 	section(ui, "Tooltip and popup positioning", |ui| {
-		ui.add_sized([ui.available_width(), 44.0], egui::Button::new("Hover for tooltip"))
-			.on_hover_text("Tooltip rendered inside embedded egui");
+		ui.add_sized(
+			[ui.available_width(), 46.0],
+			egui::Button::new(RichText::new("Hover for tooltip").color(TEXT).strong())
+				.fill(BUTTON_BG)
+				.stroke(Stroke::new(1.0, CARD_STROKE))
+				.corner_radius(8),
+		)
+		.on_hover_text("Tooltip rendered inside embedded egui");
 		status_chip(ui, "Expected", "tooltip near target, no host offset bug");
 	});
 }
 
 fn lazy_list_probe(ui: &mut egui::Ui, state: &mut DiagnosticState) {
 	section(ui, "Lazy dynamic list", |ui| {
-		let row_height = 28.0;
+		let row_height = 34.0;
 		let mut visible = (usize::MAX, 0);
 		egui::ScrollArea::vertical()
 			.max_height(360.0)
@@ -458,8 +634,7 @@ fn lazy_list_probe(ui: &mut egui::Ui, state: &mut DiagnosticState) {
 			.show_rows(ui, row_height, LAZY_ITEM_COUNT, |ui, range| {
 				visible = (range.start, range.end);
 				for ix in range {
-					let selected = state.selected_lazy_item == Some(ix);
-					let response = ui.selectable_label(selected, format!("Lazy row {ix}     #{ix:04}"));
+					let response = lazy_row(ui, ix, state.selected_lazy_item == Some(ix));
 					if response.clicked() {
 						state.selected_lazy_item = Some(ix);
 					}
@@ -471,13 +646,13 @@ fn lazy_list_probe(ui: &mut egui::Ui, state: &mut DiagnosticState) {
 		}
 
 		ui.horizontal(|ui| {
-			if ui.button("Top").clicked() {
+			if action_button(ui, "Top").clicked() {
 				state.selected_lazy_item = Some(0);
 			}
-			if ui.button("Middle").clicked() {
+			if action_button(ui, "Middle").clicked() {
 				state.selected_lazy_item = Some(LAZY_ITEM_COUNT / 2);
 			}
-			if ui.button("End").clicked() {
+			if action_button(ui, "End").clicked() {
 				state.selected_lazy_item = Some(LAZY_ITEM_COUNT - 1);
 			}
 		});
@@ -495,6 +670,53 @@ fn lazy_list_probe(ui: &mut egui::Ui, state: &mut DiagnosticState) {
 				.unwrap_or_else(|| "none".to_string()),
 		);
 	});
+}
+
+fn lazy_row(ui: &mut egui::Ui, ix: usize, selected: bool) -> egui::Response {
+	let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 30.0), Sense::click());
+	let hovered = response.hovered();
+	let fill = if selected {
+		Color32::from_rgb(20, 92, 118)
+	} else if hovered {
+		Color32::from_rgb(25, 34, 48)
+	} else if ix % 2 == 0 {
+		Color32::from_rgb(15, 20, 28)
+	} else {
+		Color32::from_rgb(13, 18, 25)
+	};
+	let stroke = if selected {
+		Stroke::new(1.0, ACCENT)
+	} else {
+		Stroke::new(1.0, Color32::TRANSPARENT)
+	};
+
+	ui.painter().rect(
+		rect.shrink2(Vec2::new(0.0, 1.0)),
+		6.0,
+		fill,
+		stroke,
+		egui::StrokeKind::Inside,
+	);
+	ui.painter().text(
+		egui::pos2(rect.left() + 10.0, rect.center().y),
+		egui::Align2::LEFT_CENTER,
+		format!("Lazy row {ix}"),
+		FontId::proportional(13.0),
+		if selected { Color32::WHITE } else { TEXT },
+	);
+	ui.painter().text(
+		egui::pos2(rect.right() - 10.0, rect.center().y),
+		egui::Align2::RIGHT_CENTER,
+		format!("#{ix:04}"),
+		FontId::monospace(12.0),
+		if selected {
+			Color32::from_rgb(206, 244, 255)
+		} else {
+			MUTED
+		},
+	);
+
+	response
 }
 
 fn manual_matrix(ui: &mut egui::Ui) {
