@@ -1,14 +1,17 @@
-use std::time::Instant;
+use std::{
+	sync::{Arc, Mutex},
+	time::{Duration, Instant},
+};
 
 use baseview::{
 	Event, EventStatus, PhySize, Window, WindowHandle, WindowHandler, WindowOpenOptions, WindowScalePolicy,
 };
 use copypasta::ClipboardProvider;
-use egui::{pos2, vec2, Pos2, Rect, Rgba, ViewportCommand};
+use egui::{Pos2, Rect, Rgba, ViewportCommand, pos2, vec2};
 use keyboard_types::Modifiers;
 use raw_window_handle::HasRawWindowHandle;
 
-use crate::{renderer::Renderer, GraphicsConfig};
+use crate::{GraphicsConfig, renderer::Renderer};
 
 pub struct Queue<'a> {
 	bg_color: &'a mut Rgba,
@@ -40,6 +43,31 @@ impl<'a> Queue<'a> {
 	/// Close the window.
 	pub fn close_window(&mut self) {
 		*self.close_requested = true;
+	}
+}
+
+#[derive(Clone, Default)]
+pub struct RepaintSignal {
+	inner: Arc<Mutex<Option<Instant>>>,
+}
+
+impl RepaintSignal {
+	pub fn request_repaint(&self) {
+		self.request_repaint_after(Duration::ZERO);
+	}
+
+	pub fn request_repaint_after(&self, delay: Duration) {
+		let repaint_after = Instant::now()
+			.checked_add(delay)
+			.unwrap_or_else(|| Instant::now() + Duration::from_secs(60 * 60 * 24));
+		let mut signal = self.inner.lock().unwrap();
+		if signal.map_or(true, |current| repaint_after < current) {
+			*signal = Some(repaint_after);
+		}
+	}
+
+	fn take(&self) -> Option<Instant> {
+		self.inner.lock().unwrap().take()
 	}
 }
 
@@ -95,6 +123,7 @@ where
 	bg_color: Rgba,
 	close_requested: bool,
 	repaint_after: Option<Instant>,
+	repaint_signal: RepaintSignal,
 }
 
 impl<State, U> EguiWindow<State, U>
@@ -107,6 +136,7 @@ where
 		window: &mut baseview::Window<'_>,
 		open_settings: OpenSettings,
 		graphics_config: GraphicsConfig,
+		repaint_signal: RepaintSignal,
 		mut build: B,
 		update: U,
 		mut state: State,
@@ -121,6 +151,12 @@ where
 			panic!("gpu backend failed to initialize: \n {err}")
 		});
 		let egui_ctx = egui::Context::default();
+		egui_ctx.set_request_repaint_callback({
+			let repaint_signal = repaint_signal.clone();
+			move |info| {
+				repaint_signal.request_repaint_after(info.delay);
+			}
+		});
 
 		// Assume scale for now until there is an event with a new one.
 		let pixels_per_point = match open_settings.scale_policy {
@@ -193,6 +229,7 @@ where
 			bg_color,
 			close_requested,
 			repaint_after: Some(start_time),
+			repaint_signal,
 		}
 	}
 
@@ -218,6 +255,31 @@ where
 		B: FnMut(&egui::Context, &mut Queue, &mut State),
 		B: 'static + Send,
 	{
+		Self::open_parented_with_repaint_signal(
+			parent,
+			settings,
+			graphics_config,
+			RepaintSignal::default(),
+			state,
+			build,
+			update,
+		)
+	}
+
+	pub fn open_parented_with_repaint_signal<P, B>(
+		parent: &P,
+		#[allow(unused_mut)] mut settings: WindowOpenOptions,
+		graphics_config: GraphicsConfig,
+		repaint_signal: RepaintSignal,
+		state: State,
+		build: B,
+		update: U,
+	) -> WindowHandle
+	where
+		P: HasRawWindowHandle,
+		B: FnMut(&egui::Context, &mut Queue, &mut State),
+		B: 'static + Send,
+	{
 		#[cfg(feature = "opengl")]
 		if settings.gl_config.is_none() {
 			settings.gl_config = Some(Default::default());
@@ -229,7 +291,15 @@ where
 			parent,
 			settings,
 			move |window: &mut baseview::Window<'_>| -> EguiWindow<State, U> {
-				EguiWindow::new(window, open_settings, graphics_config, build, update, state)
+				EguiWindow::new(
+					window,
+					open_settings,
+					graphics_config,
+					repaint_signal,
+					build,
+					update,
+					state,
+				)
 			},
 		)
 	}
@@ -262,7 +332,15 @@ where
 		Window::open_blocking(
 			settings,
 			move |window: &mut baseview::Window<'_>| -> EguiWindow<State, U> {
-				EguiWindow::new(window, open_settings, graphics_config, build, update, state)
+				EguiWindow::new(
+					window,
+					open_settings,
+					graphics_config,
+					RepaintSignal::default(),
+					build,
+					update,
+					state,
+				)
 			},
 		)
 	}
@@ -305,6 +383,21 @@ where
 		let Some(state) = &mut self.user_state else {
 			return;
 		};
+
+		if let Some(signaled_repaint) = self.repaint_signal.take() {
+			self.repaint_after = Some(
+				self
+					.repaint_after
+					.map_or(signaled_repaint, |current| current.min(signaled_repaint)),
+			);
+		}
+
+		let now = Instant::now();
+		match self.repaint_after {
+			Some(repaint_after) if now < repaint_after => return,
+			None => return,
+			_ => {}
+		}
 
 		self.egui_input.time = Some(self.start_time.elapsed().as_secs_f64());
 		self.egui_input.screen_rect = Some(calculate_screen_rect(self.physical_size, self.points_per_pixel));
@@ -350,29 +443,22 @@ where
 			}
 		}
 
-		let now = Instant::now();
-		let do_repaint_now = if let Some(t) = self.repaint_after {
-			now >= t || viewport_output.repaint_delay.is_zero()
+		let repaint_delay = viewport_output.repaint_delay;
+		self.renderer.render(
+			#[cfg(feature = "opengl")]
+			window,
+			self.bg_color,
+			self.physical_size,
+			self.pixels_per_point,
+			&mut self.egui_ctx,
+			&mut full_output,
+		);
+
+		self.repaint_after = if repaint_delay == Duration::MAX {
+			None
 		} else {
-			viewport_output.repaint_delay.is_zero()
+			now.checked_add(repaint_delay)
 		};
-
-		if do_repaint_now {
-			self.renderer.render(
-				#[cfg(feature = "opengl")]
-				window,
-				self.bg_color,
-				self.physical_size,
-				self.pixels_per_point,
-				&mut self.egui_ctx,
-				&mut full_output,
-			);
-
-			self.repaint_after = None;
-		} else if let Some(repaint_after) = now.checked_add(viewport_output.repaint_delay) {
-			// Schedule to repaint after the requested time has elapsed.
-			self.repaint_after = Some(repaint_after);
-		}
 
 		for command in full_output.platform_output.commands {
 			match command {
@@ -580,6 +666,7 @@ where
 			},
 		}
 
+		self.repaint_after = Some(Instant::now());
 		event_status
 	}
 }

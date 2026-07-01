@@ -1,16 +1,16 @@
 //! An [`Editor`] implementation for egui.
 
 use crate::{
-	egui::{Vec2, ViewportCommand},
 	EguiState,
+	egui::{Vec2, ViewportCommand},
 };
-use baseview::{gl::GlConfig, PhySize, Size, WindowHandle, WindowOpenOptions, WindowScalePolicy};
+use baseview::{PhySize, Size, WindowHandle, WindowOpenOptions, WindowScalePolicy, gl::GlConfig};
 use crossbeam::atomic::AtomicCell;
-use egui_baseview::{egui::Context, EguiWindow};
+use egui_baseview::{EguiWindow, RepaintSignal, egui::Context};
 use nih_plug::prelude::{Editor, GuiContext, ParamSetter, ParentWindowHandle};
 use parking_lot::RwLock;
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
-use std::sync::{atomic::Ordering, Arc};
+use std::sync::{Arc, atomic::Ordering};
 
 /// An [`Editor`] implementation that calls an egui draw loop.
 pub(crate) struct EguiEditor<T> {
@@ -26,6 +26,9 @@ pub(crate) struct EguiEditor<T> {
 	/// The scaling factor reported by the host, if any. On macOS this will never be set and we
 	/// should use the system scaling factor instead.
 	pub(crate) scaling_factor: AtomicCell<Option<f32>>,
+
+	/// Shared with the baseview window so parameter changes can wake an idle editor.
+	pub(crate) repaint_signal: RepaintSignal,
 }
 
 /// This version of `baseview` uses a different version of `raw_window_handle than NIH-plug, so we
@@ -66,7 +69,7 @@ where
 
 		let (unscaled_width, unscaled_height) = self.egui_state.size();
 		let scaling_factor = self.scaling_factor.load();
-		let window = EguiWindow::open_parented(
+		let window = EguiWindow::open_parented_with_repaint_signal(
 			&ParentWindowHandleAdapter(parent),
 			WindowOpenOptions {
 				title: String::from("egui window"),
@@ -95,6 +98,7 @@ where
 				}),
 			},
 			Default::default(),
+			self.repaint_signal.clone(),
 			state,
 			move |egui_ctx, _queue, state| build(egui_ctx, &mut state.write()),
 			move |egui_ctx, queue, state| {
@@ -119,11 +123,6 @@ where
 					}
 				}
 
-				// For now, just always redraw. Most plugin GUIs have meters, and those almost always
-				// need a redraw. Later we can try to be a bit more sophisticated about this. Without
-				// this we would also have a blank GUI when it gets first opened because most DAWs open
-				// their GUI while the window is still unmapped.
-				egui_ctx.request_repaint();
 				(update)(egui_ctx, &setter, &mut state.write());
 			},
 		);
@@ -159,15 +158,13 @@ where
 	}
 
 	fn param_value_changed(&self, _id: &str, _normalized_value: f32) {
-		// As mentioned above, for now we'll always force a redraw to allow meter widgets to work
-		// correctly. In the future we can use an `Arc<AtomicBool>` and only force a redraw when
-		// that boolean is set.
+		self.repaint_signal.request_repaint();
 	}
 
 	fn param_modulation_changed(&self, _id: &str, _modulation_offset: f32) {}
 
 	fn param_values_changed(&self) {
-		// Same
+		self.repaint_signal.request_repaint();
 	}
 }
 

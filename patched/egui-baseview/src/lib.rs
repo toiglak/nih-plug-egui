@@ -2,7 +2,7 @@ mod renderer;
 mod translate;
 mod window;
 
-pub use window::{EguiWindow, Queue};
+pub use window::{EguiWindow, Queue, RepaintSignal};
 
 pub use egui;
 pub use renderer::GraphicsConfig;

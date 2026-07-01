@@ -7,6 +7,7 @@
 
 use crossbeam::atomic::AtomicCell;
 use egui::Context;
+use egui_baseview::RepaintSignal;
 use nih_plug::{
 	params::persist::PersistentField,
 	prelude::{Editor, ParamSetter},
@@ -14,8 +15,8 @@ use nih_plug::{
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::{
-	atomic::{AtomicBool, Ordering},
 	Arc,
+	atomic::{AtomicBool, Ordering},
 };
 
 #[cfg(not(feature = "opengl"))]
@@ -62,6 +63,7 @@ where
 		scaling_factor: AtomicCell::new(None),
 		#[cfg(not(target_os = "macos"))]
 		scaling_factor: AtomicCell::new(Some(1.0)),
+		repaint_signal: RepaintSignal::default(),
 	}))
 }
 
