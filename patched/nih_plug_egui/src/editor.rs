@@ -1,16 +1,16 @@
 //! An [`Editor`] implementation for egui.
 
 use crate::{
-	EguiState,
 	egui::{Vec2, ViewportCommand},
+	EguiState,
 };
-use baseview::{PhySize, Size, WindowHandle, WindowOpenOptions, WindowScalePolicy, gl::GlConfig};
+use baseview::{gl::GlConfig, PhySize, Size, WindowHandle, WindowOpenOptions, WindowScalePolicy};
 use crossbeam::atomic::AtomicCell;
-use egui_baseview::{EguiWindow, RepaintSignal, egui::Context};
+use egui_baseview::{egui::Context, EguiWindow, RepaintSignal};
 use nih_plug::prelude::{Editor, GuiContext, ParamSetter, ParentWindowHandle};
 use parking_lot::RwLock;
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
-use std::sync::{Arc, atomic::Ordering};
+use std::sync::{atomic::Ordering, Arc};
 
 /// An [`Editor`] implementation that calls an egui draw loop.
 pub(crate) struct EguiEditor<T> {

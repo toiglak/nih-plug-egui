@@ -7,11 +7,11 @@ use baseview::{
 	Event, EventStatus, PhySize, Window, WindowHandle, WindowHandler, WindowOpenOptions, WindowScalePolicy,
 };
 use copypasta::ClipboardProvider;
-use egui::{Pos2, Rect, Rgba, ViewportCommand, pos2, vec2};
+use egui::{pos2, vec2, Pos2, Rect, Rgba, ViewportCommand};
 use keyboard_types::Modifiers;
 use raw_window_handle::HasRawWindowHandle;
 
-use crate::{GraphicsConfig, renderer::Renderer};
+use crate::{renderer::Renderer, GraphicsConfig};
 
 pub struct Queue<'a> {
 	bg_color: &'a mut Rgba,

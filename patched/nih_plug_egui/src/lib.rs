@@ -15,8 +15,8 @@ use nih_plug::{
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::{
-	Arc,
 	atomic::{AtomicBool, Ordering},
+	Arc,
 };
 
 #[cfg(not(feature = "opengl"))]
