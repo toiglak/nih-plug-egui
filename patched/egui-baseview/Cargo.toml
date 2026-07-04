@@ -32,7 +32,7 @@ egui_glow = { version = "0.31", features = ["x11"], optional = true }
 egui-wgpu = { version = "0.31", features = ["x11"], optional = true }
 wgpu = { version = "24.0.0", optional = true }
 keyboard-types = { version = "0.6", default-features = false }
-baseview = { git = "https://github.com/Cmdv/baseview.git", branch = "resize-window" }
+baseview = { git = "https://github.com/toiglak/baseview.git", rev = "2a8d3a6cd40d35eba03483125923af770de0a84e" }
 raw-window-handle = "0.5"
 raw-window-handle-06 = { package = "raw-window-handle", version = "0.6", optional = true }
 # TODO: Enable wayland feature when baseview gets wayland support.

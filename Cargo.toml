@@ -4,7 +4,6 @@ members = [
     ".",
     "xtask",
 ]
-exclude = ["patched/baseview"]
 
 [workspace.package]
 edition = "2021"
@@ -36,6 +35,3 @@ nih_plug_egui = { workspace = true }
 
 [dev-dependencies]
 nih_plug = { workspace = true, features = ["standalone"] }
-
-[patch."https://github.com/RustAudio/baseview.git"]
-baseview = { path = "patched/baseview" }
